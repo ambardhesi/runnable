@@ -19,7 +19,7 @@ func NewJobService(jobStoreSvc runnable.JobStoreService, logFileSvc runnable.Log
 	}
 }
 
-func (jobSvc *JobService) Start(ownerID string, command string, args ...string) (jobID string, err error) {
+func (jobSvc *JobService) Start(ownerID string, command string, args ...string) (string, error) {
 	job, err := runnable.NewJob(ownerID, command, args...)
 	if err != nil {
 		return "", err
@@ -68,7 +68,7 @@ func (jobSvc *JobService) Stop(ownerID string, jobID string) error {
 	return nil
 }
 
-func (jobSvc *JobService) Get(ownerID string, jobID string) (job *runnable.Job, err error) {
+func (jobSvc *JobService) Get(ownerID string, jobID string) (*runnable.Job, error) {
 	job, exists := jobSvc.jobStoreSvc.Get(jobID)
 	if !exists {
 		return nil, &runnable.Error{
@@ -81,7 +81,7 @@ func (jobSvc *JobService) Get(ownerID string, jobID string) (job *runnable.Job, 
 	return job, nil
 }
 
-func (jobSvc *JobService) GetLogs(ownerID string, jobID string) (logs *string, err error) {
+func (jobSvc *JobService) GetLogs(ownerID string, jobID string) (*string, error) {
 	_, exists := jobSvc.jobStoreSvc.Get(jobID)
 	if !exists {
 		return nil, &runnable.Error{

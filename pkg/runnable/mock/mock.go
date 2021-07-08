@@ -9,14 +9,23 @@ import (
 	"github.com/ambardhesi/runnable/pkg/runnable"
 )
 
+type BufWriteCloser struct {
+	*bytes.Buffer
+}
+
+func (bwc *BufWriteCloser) Close() error {
+	// no op
+	return nil
+}
+
 type MockLogFileService struct {
 	Buf   *bytes.Buffer
 	JobID string
 }
 
-func (mockLfs *MockLogFileService) CreateLogFile(jobID string) (writer io.Writer, err error) {
+func (mockLfs *MockLogFileService) CreateLogFile(jobID string) (writer io.WriteCloser, err error) {
 	mockLfs.JobID = jobID
-	return mockLfs.Buf, nil
+	return &BufWriteCloser{mockLfs.Buf}, nil
 }
 
 func (mockLfs *MockLogFileService) GetLogFile(jobID string) (readCloser io.ReadCloser, err error) {

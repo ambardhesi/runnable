@@ -11,7 +11,7 @@ import (
 
 type State string
 
-// All the possible states of a job.
+// All the possible statuses of a job.
 const (
 	NotStarted State = "NotStarted"
 	Running          = "Running"
@@ -20,15 +20,19 @@ const (
 	Stopped          = "Stopped"
 )
 
+type Status struct {
+	State     State
+	StartTime time.Time
+	EndTime   time.Time
+	ExitCode  int
+}
+
 type Job struct {
 	ID        string
 	Cmd       *exec.Cmd
 	OwnerID   string
-	startTime time.Time
-	endTime   time.Time
-	state     State
-	exitCode  int
-	logWriter io.Writer
+	status    Status
+	logWriter io.WriteCloser
 	lock      sync.RWMutex
 }
 
@@ -46,46 +50,29 @@ func NewJob(ownerID string, command string, args ...string) (*Job, error) {
 	cmd := exec.Command(command, args...)
 	jobID := uuid.NewString()
 
+	status := Status{
+		State:    NotStarted,
+		ExitCode: -1,
+	}
+
 	return &Job{
-		ID:       jobID,
-		Cmd:      cmd,
-		OwnerID:  ownerID,
-		state:    NotStarted,
-		exitCode: -1,
+		ID:      jobID,
+		Cmd:     cmd,
+		OwnerID: ownerID,
+		status:  status,
 	}, nil
 
 }
 
-func (job *Job) SetLogWriter(writer io.Writer) {
-	job.logWriter = writer
+func (job *Job) SetLogWriter(wc io.WriteCloser) {
+	job.logWriter = wc
 }
 
 // get job's state
-func (job *Job) State() State {
+func (job *Job) Status() Status {
 	job.lock.RLock()
 	defer job.lock.RUnlock()
-	return job.state
-}
-
-// get job's start time
-func (job *Job) StartTime() time.Time {
-	job.lock.RLock()
-	defer job.lock.RUnlock()
-	return job.startTime
-}
-
-// get job's end time
-func (job *Job) EndTime() time.Time {
-	job.lock.RLock()
-	defer job.lock.RUnlock()
-	return job.endTime
-}
-
-// get job's exit code
-func (job *Job) ExitCode() int {
-	job.lock.RLock()
-	defer job.lock.RUnlock()
-	return job.exitCode
+	return job.status
 }
 
 // Runs the job by calling Cmd.Run()
@@ -96,7 +83,7 @@ func (job *Job) Start() error {
 	defer job.lock.Unlock()
 
 	op := "JobService.Start"
-	if job.state != NotStarted {
+	if job.status.State != NotStarted {
 		return &Error{
 			Code:    EINVALID,
 			Op:      op,
@@ -126,51 +113,77 @@ func (job *Job) Start() error {
 		}
 	}
 
-	job.state = Running
-	job.startTime = time.Now()
-
 	_, err = io.Copy(job.logWriter, logOutput)
 	if err != nil {
 		return err
 	}
 
-	go job.wait()
+	job.status.State = Running
+	job.status.StartTime = time.Now()
+
+	go func() {
+		err := job.wait()
+		if err != nil {
+			// task failed, set status to Failed
+			job.lock.Lock()
+			defer job.lock.Unlock()
+
+			job.status.State = Failed
+			job.status.EndTime = time.Now()
+		}
+	}()
 
 	return nil
 }
 
 // Waits for the wrapped process to finish before updating exit code (else there will be a race on Cmd)
 // Also updates the job state and end time.
-func (job *Job) wait() {
-	err := job.Cmd.Wait()
+func (job *Job) wait() error {
+	defer job.logWriter.Close()
+
+	var exitCode int
+
+	switch err := job.Cmd.Wait().(type) {
+	case nil:
+		// job completed successfully
+		exitCode = job.Cmd.ProcessState.ExitCode()
+
+	case *exec.ExitError:
+		// job exited with an exit code
+		exitCode = err.ProcessState.ExitCode()
+
+	default:
+		// job failed
+		return err
+	}
 
 	job.lock.Lock()
 	defer job.lock.Unlock()
 
-	job.exitCode = job.Cmd.ProcessState.ExitCode()
-
-	// update the job's state based on if it succeeded or failed
-	// however, we should check first if it wasnt already stopped (by the user)
-	if job.state == Stopped {
-		return
+	// if job has already failed or completed, do nothing as we should have already updated status before
+	if job.status.State == Failed || job.status.State == Completed {
+		return nil
 	}
 
-	var state State
-	if err != nil {
-		state = Failed
-	} else {
-		state = Completed
+	job.status.ExitCode = exitCode
+	job.status.EndTime = time.Now()
+	// Update the job's state and end time.
+	// However, we should check first if it wasnt already stopped (by the user).
+	if job.status.State != Stopped {
+		job.status.State = Completed
 	}
 
-	job.state = state
-	job.endTime = time.Now()
+	return nil
 }
 
 // Stops the job.
 // Returns InvalidStateError if the job is not currently Running.
 func (job *Job) Stop() error {
+	job.lock.Lock()
+	defer job.lock.Unlock()
+
 	op := "JobService.Stop"
-	if job.State() != Running {
+	if job.status.State != Running {
 		return &Error{
 			Code:    EINVALID,
 			Op:      op,
@@ -179,8 +192,6 @@ func (job *Job) Stop() error {
 	}
 
 	err := job.Cmd.Process.Kill()
-	job.lock.Lock()
-	defer job.lock.Unlock()
 
 	if err != nil {
 		return &Error{
@@ -191,8 +202,7 @@ func (job *Job) Stop() error {
 		}
 	}
 
-	job.endTime = time.Now()
-	job.state = Stopped
+	job.status.State = Stopped
 
 	return nil
 }

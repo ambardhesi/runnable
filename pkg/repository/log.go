@@ -19,7 +19,7 @@ type LocalFileSystem struct {
 
 func NewLocalFileSystem(dir string) (*LocalFileSystem, error) {
 	// create a dir for storing logs, with relevant permissions
-	err := checkAndCreateLogsDir(dir)
+	err := os.MkdirAll(dir, userReadWriteExecutePermission)
 	if err != nil {
 		return nil, &runnable.Error{
 			Message: "Failed to create log dir.",
@@ -32,17 +32,7 @@ func NewLocalFileSystem(dir string) (*LocalFileSystem, error) {
 	}, nil
 }
 
-// if the log dir doesn't exist, create it
-func checkAndCreateLogsDir(dir string) error {
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return os.MkdirAll(dir, userReadWriteExecutePermission)
-	}
-	return nil
-}
-
-func (lfs *LocalFileSystem) CreateLogFile(jobID string) (io.Writer, error) {
-	checkAndCreateLogsDir(lfs.dir)
-
+func (lfs *LocalFileSystem) CreateLogFile(jobID string) (io.WriteCloser, error) {
 	logFile, err := os.Create(path.Join(lfs.dir, jobID))
 	if err != nil {
 		return nil, &runnable.Error{

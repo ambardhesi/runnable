@@ -5,19 +5,19 @@ import (
 )
 
 type JobService interface {
-	Start(ownerID string, command string, args ...string) (jobID string, err error)
+	Start(ownerID string, command string, args ...string) (string, error)
 	Stop(ownerID string, jobID string) error
-	Get(ownerID string, jobID string) (job *Job, err error)
-	GetLogs(ownerID string, jobID string) (logs *string, err error)
+	Get(ownerID string, jobID string) (*Job, error)
+	GetLogs(ownerID string, jobID string) (*string, error)
 }
 
 type JobStoreService interface {
 	Store(job *Job) error
-	Get(jobID string) (job *Job, exists bool)
+	Get(jobID string) (*Job, bool)
 }
 
 type LogFileService interface {
-	CreateLogFile(jobID string) (writer io.Writer, err error)
-	GetLogFile(jobID string) (readCloser io.ReadCloser, err error)
+	CreateLogFile(jobID string) (io.WriteCloser, error)
+	GetLogFile(jobID string) (io.ReadCloser, error)
 	DeleteAllLogFiles() error
 }

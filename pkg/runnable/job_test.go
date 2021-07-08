@@ -10,18 +10,19 @@ import (
 	"time"
 
 	"github.com/ambardhesi/runnable/pkg/runnable"
+	"github.com/ambardhesi/runnable/pkg/runnable/mock"
 )
 
 func TestNewJob(t *testing.T) {
 	job, _ := runnable.NewJob("ownerID", "command name", "arg1", "arg2")
 	b := &bytes.Buffer{}
-	job.SetLogWriter(b)
+	job.SetLogWriter(&mock.BufWriteCloser{b})
 
 	if job.ID == "" {
 		t.Errorf("expected non empty string for job ID")
 	}
 
-	if job.ExitCode() != -1 {
+	if job.Status().ExitCode != -1 {
 		t.Errorf("expected default exit code of -1")
 	}
 
@@ -29,7 +30,7 @@ func TestNewJob(t *testing.T) {
 		t.Errorf("expected ownerID to be ownerID")
 	}
 
-	if job.State() != runnable.NotStarted {
+	if job.Status().State != runnable.NotStarted {
 		t.Errorf("expected initial state to be NotStarted")
 	}
 }
@@ -39,18 +40,18 @@ func TestStartEcho(t *testing.T) {
 	args := []string{"hello world"}
 	job, _ := runnable.NewJob("ownerID", cmd, args...)
 	b := &bytes.Buffer{}
-	job.SetLogWriter(b)
+	job.SetLogWriter(&mock.BufWriteCloser{b})
 
 	job.Cmd = fakeCmd(cmd, args...)
 	job.Start()
 
 	time.Sleep(500 * time.Millisecond)
 
-	if ec := job.ExitCode(); ec != 0 {
+	if ec := job.Status().ExitCode; ec != 0 {
 		t.Errorf("expected exit code %v, got %v", 0, ec)
 	}
 
-	if state := job.State(); state != runnable.Completed {
+	if state := job.Status().State; state != runnable.Completed {
 		t.Errorf("expected state %v, got %v", runnable.Completed, state)
 	}
 }
@@ -61,42 +62,39 @@ func TestStartExit(t *testing.T) {
 	args := []string{"1"}
 	job, _ := runnable.NewJob("ownerID", cmd, args...)
 	b := &bytes.Buffer{}
-	job.SetLogWriter(b)
+	job.SetLogWriter(&mock.BufWriteCloser{b})
 
 	job.Cmd = fakeCmd(cmd, args...)
 	job.Start()
 
 	time.Sleep(500 * time.Millisecond)
 
-	if ec := job.ExitCode(); ec != 1 {
+	if ec := job.Status().ExitCode; ec != 1 {
 		t.Errorf("expected exit code %v, got %v", 1, ec)
 	}
 
-	if state := job.State(); state != runnable.Failed {
-		t.Errorf("expected state %v, got %v", runnable.Failed, state)
+	if state := job.Status().State; state != runnable.Completed {
+		t.Errorf("expected state %v, got %v", runnable.Completed, state)
 	}
 }
 
 func TestStopRunningJob(t *testing.T) {
 	job, _ := runnable.NewJob("ownerID", "sleep", "1")
 	b := &bytes.Buffer{}
-	job.SetLogWriter(b)
+	job.SetLogWriter(&mock.BufWriteCloser{b})
 
 	job.Cmd = fakeCmd("sleep", "1")
-	go func() {
-		job.Start()
-	}()
-
-	for state := job.State(); state != runnable.Running; state = job.State() {
-	}
+	job.Start()
 
 	job.Stop()
+	// give job a chance to be stopped (or completed) before doing any assertions
+	time.Sleep(500 * time.Millisecond)
 
-	if ec := job.ExitCode(); ec != -1 {
-		t.Errorf("expected exit code %v, got %v", -1, ec)
+	if ec := job.Status().ExitCode; ec != 0 {
+		t.Errorf("expected exit code %v, got %v", 0, ec)
 	}
 
-	if state := job.State(); state != runnable.Stopped {
+	if state := job.Status().State; state != runnable.Stopped {
 		t.Errorf("expected state %v, got %v", runnable.Stopped, state)
 	}
 }
@@ -104,19 +102,20 @@ func TestStopRunningJob(t *testing.T) {
 func TestStopCompletedJob(t *testing.T) {
 	job, _ := runnable.NewJob("ownerID", "exit", "0")
 	b := &bytes.Buffer{}
-	job.SetLogWriter(b)
+	job.SetLogWriter(&mock.BufWriteCloser{b})
 
 	job.Cmd = fakeCmd("exit", "0")
 	job.Start()
 
+	// give job a chance to complete before attempting to stop
 	time.Sleep(200 * time.Millisecond)
 	job.Stop()
 
-	if ec := job.ExitCode(); ec != 0 {
+	if ec := job.Status().ExitCode; ec != 0 {
 		t.Errorf("expected exit code %v, got %v", 0, ec)
 	}
 
-	if state := job.State(); state != runnable.Completed {
+	if state := job.Status().State; state != runnable.Completed {
 		t.Errorf("expected state %v, got %v", runnable.Completed, state)
 	}
 }
