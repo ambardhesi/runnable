@@ -66,6 +66,8 @@ func NewJob(ownerID string, command string, args ...string) (*Job, error) {
 
 func (job *Job) SetLogWriter(wc io.WriteCloser) {
 	job.logWriter = wc
+	job.Cmd.Stdout = wc
+	job.Cmd.Stderr = wc
 }
 
 // get job's state
@@ -91,19 +93,7 @@ func (job *Job) Start() error {
 		}
 	}
 
-	stdout, err := job.Cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	stderr, err := job.Cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	logOutput := io.MultiReader(stdout, stderr)
-
-	err = job.Cmd.Start()
+	err := job.Cmd.Start()
 	if err != nil {
 		return &Error{
 			Code:    EINTERNAL,
@@ -111,11 +101,6 @@ func (job *Job) Start() error {
 			Message: "Failed to start job.",
 			Err:     err,
 		}
-	}
-
-	_, err = io.Copy(job.logWriter, logOutput)
-	if err != nil {
-		return err
 	}
 
 	job.status.State = Running
