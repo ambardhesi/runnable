@@ -1,11 +1,21 @@
-.PHONY: clean test vendor
+.PHONY: binaries clean test vendor
+
+GOCMD=go
+GOBUILD=$(GOCMD) build
+GOCLEAN=$(GOCMD) clean
+GOTEST=$(GOCMD) test
+ROOT=$(shell pwd)
+COMMANDS=$(shell go list ./... | grep cmd/)
+
+binaries:
+	$(GOBUILD) -o "." $(COMMANDS) 	
 
 clean:
 	rm -rf vendor
-	go clean
+	$(GOCLEAN)
 
 test: vendor
-	go test -v -race ./...
+	$(GOTEST) -v -race ./...
 
 vendor:
-	go mod vendor
+	$(GOCMD) mod vendor

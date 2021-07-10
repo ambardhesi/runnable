@@ -60,7 +60,7 @@ func (lfs *LocalFileSystem) GetLogFile(jobID string) (io.ReadCloser, error) {
 	return logFile, nil
 }
 
-func (lfs *LocalFileSystem) DeleteAllLogs() error {
+func (lfs *LocalFileSystem) DeleteAllLogFiles() error {
 	err := os.RemoveAll(lfs.dir)
 	if err != nil {
 		return &runnable.Error{
