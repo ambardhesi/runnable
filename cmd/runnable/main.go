@@ -10,8 +10,12 @@ import (
 func main() {
 	config := server.Config{
 		// TODO configure this to be _really_ configurable, and not hardcoded
-		Port:   8080,
-		LogDir: "logs",
+		Port:           8080,
+		LogDir:         "logs",
+		CertFilePath:   "certs/svr-cert.pem",
+		KeyFilePath:    "certs/svr-key.pem",
+		CaCertFilePath: "certs/ca-cert.pem",
+		TestMode:       false,
 	}
 
 	s, err := server.NewServer(config)

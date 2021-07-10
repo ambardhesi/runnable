@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -18,9 +17,8 @@ var (
 
 func stopJob(cobraCmd *cobra.Command, args []string) {
 	jobID := args[0]
-	client := resty.New()
 
-	resp, err := client.R().
+	resp, err := client().R().
 		Post(serverAddress + "/job/" + jobID + "/stop")
 
 	fmt.Printf("Error: %v\n", err)

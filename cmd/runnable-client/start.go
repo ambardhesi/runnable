@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/ambardhesi/runnable/internal/server"
-	"github.com/go-resty/resty/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -23,9 +22,8 @@ func startJob(cobraCmd *cobra.Command, args []string) {
 	request := server.StartJobRequest{
 		Command: cmd,
 	}
-	client := resty.New()
 
-	resp, err := client.R().
+	resp, err := client().R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(request).
 		Post(serverAddress + "/job")

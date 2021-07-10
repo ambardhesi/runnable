@@ -1,13 +1,17 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"net/http"
 
@@ -18,15 +22,19 @@ import (
 )
 
 type Config struct {
-	Port   int
-	LogDir string
-	// TODO add cert dir/file attributes
+	Port           int
+	LogDir         string
+	CertFilePath   string
+	KeyFilePath    string
+	CaCertFilePath string
+	TestMode       bool
 }
 
 type Server struct {
 	config Config
 	js     runnable.JobService
 	lfs    runnable.LogFileService
+	server http.Server
 }
 
 func NewServer(config Config) (*Server, error) {
@@ -45,11 +53,32 @@ func NewServer(config Config) (*Server, error) {
 	}, nil
 }
 
+// extracts the client ID from the client cert CN and sets it as the key
+func certMiddleware(ctx *gin.Context) {
+	tls := ctx.Request.TLS
+	if len(tls.PeerCertificates) == 0 {
+		log.Printf("No cert found in request")
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": errors.New("No cert found")})
+		return
+	}
+
+	clientCert := tls.PeerCertificates[0]
+	ownerID := clientCert.Subject.CommonName
+
+	ctx.Set("ownerID", ownerID)
+	ctx.Next()
+}
+
 func (s *Server) Start() {
-	// Log HTTP server output to console.
-	gin.DefaultWriter = io.MultiWriter(os.Stdout)
+	if !s.config.TestMode {
+		// Log HTTP server output to console.
+		gin.DefaultWriter = io.MultiWriter(os.Stdout)
+	} else {
+		gin.DefaultWriter = ioutil.Discard
+	}
 
 	router := gin.Default()
+	router.Use(certMiddleware)
 
 	// Wire up routes
 	router.POST("/job", s.StartJob)
@@ -59,8 +88,35 @@ func (s *Server) Start() {
 
 	s.monitorTerminationSignal()
 
+	tlsConfig, err := GetTLSConfig(s.config.CertFilePath, s.config.KeyFilePath, s.config.CaCertFilePath)
+	if err != nil {
+		log.Printf("Failed to get TLSConfig %v\n", tlsConfig)
+		os.Exit(1)
+	}
+
 	// Start server on port provided in config
-	router.Run(":" + strconv.Itoa(s.config.Port))
+	//router.Run(":" + strconv.Itoa(s.config.Port))
+	server := http.Server{
+		Addr:      "localhost:" + strconv.Itoa(s.config.Port),
+		Handler:   router,
+		TLSConfig: tlsConfig,
+	}
+	s.server = server
+
+	log.Fatal(server.ListenAndServeTLS("", ""))
+}
+
+func (s *Server) Stop() {
+	err := s.lfs.DeleteAllLogFiles()
+	if err != nil {
+		log.Printf("Failed to delete all log files before shutting down %v\n", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.server.Shutdown(ctx); err != nil {
+		log.Fatal("Server Shutdown:", err)
+	}
 }
 
 func (s *Server) monitorTerminationSignal() {
@@ -69,10 +125,7 @@ func (s *Server) monitorTerminationSignal() {
 
 	go func() {
 		<-killChan
-		err := s.lfs.DeleteAllLogFiles()
-		if err != nil {
-			log.Printf("Failed to delete all log files before shutting down %v\n", err)
-		}
+		s.Stop()
 		close(killChan)
 		os.Exit(1)
 	}()
@@ -87,18 +140,13 @@ func (s *Server) StartJob(ctx *gin.Context) {
 		return
 	}
 
-	// TODO grab ownerID from cert CN, hardcoded for now
+	ownerID := ctx.GetString("ownerID")
 	cmd := strings.Split(request.Command, " ")
-	jobID, err := s.js.Start("ownerID", cmd[0], cmd[1:]...)
+	jobID, err := s.js.Start(ownerID, cmd[0], cmd[1:]...)
 
 	if err != nil {
-		if runnable.ErrorCode(err) == runnable.EINVALID {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+		writeError(ctx, err)
+		return
 	}
 
 	ctx.JSON(http.StatusOK, StartJobResponse{
@@ -108,17 +156,13 @@ func (s *Server) StartJob(ctx *gin.Context) {
 
 func (s *Server) GetJob(ctx *gin.Context) {
 	jobID := ctx.Param("id")
-	// TODO grab ownerID from cert CN, hardcoded for now
-	job, err := s.js.Get("ownerID", jobID)
+	ownerID := ctx.GetString("ownerID")
+
+	job, err := s.js.Get(ownerID, jobID)
 
 	if err != nil {
-		if runnable.ErrorCode(err) == runnable.ENOTFOUND {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+		writeError(ctx, err)
+		return
 	}
 
 	ctx.JSON(http.StatusOK, FromJob(job))
@@ -126,19 +170,13 @@ func (s *Server) GetJob(ctx *gin.Context) {
 
 func (s *Server) StopJob(ctx *gin.Context) {
 	jobID := ctx.Param("id")
-	// TODO grab ownerID from cert CN, hardcoded for now
-	err := s.js.Stop("ownerID", jobID)
+	ownerID := ctx.GetString("ownerID")
+
+	err := s.js.Stop(ownerID, jobID)
 
 	if err != nil {
-		if runnable.ErrorCode(err) == runnable.ENOTFOUND {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		} else if runnable.ErrorCode(err) == runnable.EINVALID {
-			ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+		writeError(ctx, err)
+		return
 	}
 
 	ctx.String(http.StatusOK, "")
@@ -146,18 +184,26 @@ func (s *Server) StopJob(ctx *gin.Context) {
 
 func (s *Server) GetJobLogs(ctx *gin.Context) {
 	jobID := ctx.Param("id")
-	// TODO grab ownerID from cert CN, hardcoded for now
-	logs, err := s.js.GetLogs("ownerID", jobID)
+	ownerID := ctx.GetString("ownerID")
+
+	logs, err := s.js.GetLogs(ownerID, jobID)
 
 	if err != nil {
-		if runnable.ErrorCode(err) == runnable.ENOTFOUND {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+		writeError(ctx, err)
+		return
 	}
 
 	ctx.String(http.StatusOK, *logs)
+}
+
+func writeError(ctx *gin.Context, err error) {
+	if runnable.ErrorCode(err) == runnable.ENOTFOUND {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	} else if runnable.ErrorCode(err) == runnable.EINVALID {
+		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+	} else if runnable.ErrorCode(err) == runnable.EUNAUTHORIZED {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+	} else {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
 }

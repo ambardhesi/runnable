@@ -60,6 +60,17 @@ func (jobSvc *JobService) Stop(ownerID string, jobID string) error {
 		}
 	}
 
+	// TODO move auth into its own service
+	// something that takes in a jobID and ownerID and looks up whatever it needs to to make a decision
+	// this could be something like a DB call (via job service), or an external service call
+	if job.OwnerID != ownerID {
+		return &runnable.Error{
+			Code:    runnable.EUNAUTHORIZED,
+			Op:      "JobService.Stop",
+			Message: "User is unauthorized.",
+		}
+	}
+
 	err := job.Stop()
 	if err != nil {
 		return err
@@ -78,16 +89,37 @@ func (jobSvc *JobService) Get(ownerID string, jobID string) (*runnable.Job, erro
 		}
 	}
 
+	// TODO move auth into its own service
+	// something that takes in a jobID and ownerID and looks up whatever it needs to to make a decision
+	// this could be something like a DB call (via job service), or an external service call
+	if job.OwnerID != ownerID {
+		return nil, &runnable.Error{
+			Code:    runnable.EUNAUTHORIZED,
+			Op:      "JobService.Get",
+			Message: "User is unauthorized.",
+		}
+	}
+
 	return job, nil
 }
 
 func (jobSvc *JobService) GetLogs(ownerID string, jobID string) (*string, error) {
-	_, exists := jobSvc.jobStoreSvc.Get(jobID)
+	job, exists := jobSvc.jobStoreSvc.Get(jobID)
 	if !exists {
 		return nil, &runnable.Error{
 			Code:    runnable.ENOTFOUND,
 			Op:      "JobService.GetLogs",
 			Message: "Job does not exist.",
+		}
+	}
+	// TODO move auth into its own service
+	// something that takes in a jobID and ownerID and looks up whatever it needs to to make a decision
+	// this could be something like a DB call (via job service), or an external service call
+	if job.OwnerID != ownerID {
+		return nil, &runnable.Error{
+			Code:    runnable.EUNAUTHORIZED,
+			Op:      "JobService.GetLogs",
+			Message: "User is unauthorized.",
 		}
 	}
 
