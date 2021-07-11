@@ -3,10 +3,15 @@ Runnable is a simple Linux process runner, implemented as a REST API.
 
 ## Build
 ```
+make certs
+```
+This will generated keys and certs for the CA, 2 clients (Alice and Bob) and a bad client for testing.
+
+```
 $ make binaries
 ```
 
-This will create the `runnable` (CLI client) and `runnable-client` (Server) binaries in the `bin` dir. 
+This will create the `runnable` (CLI client) and `runnable-client` (Server) binaries.
 
 ## Test
 make test
@@ -36,7 +41,39 @@ The `./runnable-client` binary provides a CLI interface for making calls to the 
 
 Run `./runnable-client --help` for usage instructions.
 
-Sample command : 
+### Starting a job
 ```
-./runnable-client start echo hello world
+$ ./runnable-client --ca $path-to-ca-cert --cert $path-to-client-cert --key $path-to-client-key start echo hello world`
+
+Error: <nil>
+Response Status Code: 200
+Response Status: 200 OK
+Response body: {"jobID":"eabc5579-7f8e-48d5-ba57-dc6e17f7a3ad"}
+
+```
+
+### Stopping a job
+```
+./runnable-client --ca $path-to-ca-cert --cert $path-to-client-cert --key $path-to-client-key stop eabc5579-7f8e-48d5-ba57-dc6e17f7a3ad
+
+```
+
+### Getting a job's status
+```
+$ ./runnable-client --ca certs/ca-cert.pem --cert certs/alice-cert.pem --key certs/alice-key.pem get eabc5579-7f8e-48d5-ba57-dc6e17f7a3ad
+
+Error: <nil>
+Response Status Code: 200
+Response Status: 200 OK
+Response body: {"state":"Completed","exitCode":0,"startTime":"2021-07-11T18:48:11.844673917-04:00","endTime":"2021-07-11T18:48:11.844839512-04:00"}
+```
+
+### Getting a job's logs
+```
+$ ./runnable-client --ca certs/ca-cert.pem --cert certs/alice-cert.pem --key certs/alice-key.pem logs eabc5579-7f8e-48d5-ba57-dc6e17f7a3ad
+
+Error: <nil>
+Response Status Code: 200
+Response Status: 200 OK
+Response body: hello world
 ```
