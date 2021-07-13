@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	rclient "github.com/ambardhesi/runnable/internal/client"
-	"github.com/go-resty/resty/v2"
+	httpClient "github.com/ambardhesi/runnable/internal/client"
 	"github.com/spf13/cobra"
 )
 
@@ -24,17 +23,6 @@ var (
 	clientKeyFile  string
 )
 
-func client() *resty.Client {
-	client := resty.New()
-	tlsConfig, err := rclient.GetTLSConfig(clientCertFile, clientKeyFile, caCertFile)
-	if err != nil {
-		fmt.Printf("Failed to create http client %v\n", err)
-	}
-	client.SetTLSClientConfig(tlsConfig)
-
-	return client
-}
-
 func init() {
 	flags := rootCmd.PersistentFlags()
 
@@ -47,6 +35,22 @@ func init() {
 	}
 
 	rootCmd.AddCommand(&cmdStart, &cmdStop, &cmdGet, &cmdGetLogs)
+}
+
+func makeClient() *httpClient.Client {
+	config := httpClient.Config{
+		ServerAddress:  serverAddress,
+		CaCertFilePath: caCertFile,
+		CertFilePath:   clientCertFile,
+		KeyFilePath:    clientKeyFile,
+	}
+	client, err := httpClient.NewClient(config)
+	if err != nil {
+		fmt.Printf("Error creating client : %v\n", err)
+		os.Exit(1)
+	}
+
+	return client
 }
 
 func main() {

@@ -45,11 +45,8 @@ Run `./runnable-client --help` for usage instructions.
 ```
 $ ./runnable-client --ca $path-to-ca-cert --cert $path-to-client-cert --key $path-to-client-key start echo hello world`
 
-Error: <nil>
-Response Status Code: 200
-Response Status: 200 OK
-Response body: {"jobID":"eabc5579-7f8e-48d5-ba57-dc6e17f7a3ad"}
 
+Started job : {"jobID":"eabc5579-7f8e-48d5-ba57-dc6e17f7a3ad"}
 ```
 
 ### Stopping a job
@@ -62,18 +59,13 @@ Response body: {"jobID":"eabc5579-7f8e-48d5-ba57-dc6e17f7a3ad"}
 ```
 $ ./runnable-client --ca certs/ca-cert.pem --cert certs/alice-cert.pem --key certs/alice-key.pem get eabc5579-7f8e-48d5-ba57-dc6e17f7a3ad
 
-Error: <nil>
-Response Status Code: 200
-Response Status: 200 OK
-Response body: {"state":"Completed","exitCode":0,"startTime":"2021-07-11T18:48:11.844673917-04:00","endTime":"2021-07-11T18:48:11.844839512-04:00"}
+Job : {"state":"Completed","exitCode":0,"startTime":"2021-07-13T06:57:49.401392804-04:00","endTime":"2021-07-13T06:57:49.401505369-04:00"}
 ```
 
 ### Getting a job's logs
 ```
 $ ./runnable-client --ca certs/ca-cert.pem --cert certs/alice-cert.pem --key certs/alice-key.pem logs eabc5579-7f8e-48d5-ba57-dc6e17f7a3ad
 
-Error: <nil>
-Response Status Code: 200
-Response Status: 200 OK
-Response body: hello world
+
+logs : hello world
 ```

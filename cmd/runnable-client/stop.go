@@ -18,11 +18,9 @@ var (
 func stopJob(cobraCmd *cobra.Command, args []string) {
 	jobID := args[0]
 
-	resp, err := client().R().
-		Post(serverAddress + "/job/" + jobID + "/stop")
+	err := makeClient().StopJob(jobID)
 
-	fmt.Printf("Error: %v\n", err)
-	fmt.Printf("Response Status Code: %v\n", resp.StatusCode())
-	fmt.Printf("Response Status: %v\n", resp.Status())
-	fmt.Printf("Response body: %v\n", resp)
+	if err != nil {
+		fmt.Printf("Error %v\n", err)
+	}
 }

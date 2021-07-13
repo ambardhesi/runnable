@@ -18,11 +18,12 @@ var (
 func getJob(cobraCmd *cobra.Command, args []string) {
 	jobID := args[0]
 
-	resp, err := client().R().
-		Get(serverAddress + "/job/" + jobID)
+	job, err := makeClient().Get(jobID)
 
-	fmt.Printf("Error: %v\n", err)
-	fmt.Printf("Response Status Code: %v\n", resp.StatusCode())
-	fmt.Printf("Response Status: %v\n", resp.Status())
-	fmt.Printf("Response body: %v\n", resp)
+	if err != nil {
+		fmt.Printf("Error %v\n", err)
+		return
+	}
+
+	fmt.Printf("Job : %v\n", *job)
 }
