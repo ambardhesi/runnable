@@ -127,7 +127,6 @@ func (s *Server) monitorTerminationSignal() {
 		<-killChan
 		s.Stop()
 		close(killChan)
-		os.Exit(1)
 	}()
 }
 

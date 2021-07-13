@@ -10,20 +10,20 @@ var (
 	cmdGetLogs = cobra.Command{
 		Use:   "logs [jobId]",
 		Short: "Gets the job logs for the given ID.",
-		Run:   getJobLogs,
+		RunE:  getJobLogs,
 		Args:  cobra.ExactArgs(1),
 	}
 )
 
-func getJobLogs(cobraCmd *cobra.Command, args []string) {
+func getJobLogs(cobraCmd *cobra.Command, args []string) error {
 	jobID := args[0]
 
 	logs, err := makeClient().GetLogs(jobID)
 
 	if err != nil {
-		fmt.Printf("Error %v\n", err)
-		return
+		return err
 	}
 
 	fmt.Printf("logs : %v\n", *logs)
+	return nil
 }
