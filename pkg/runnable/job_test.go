@@ -1,22 +1,23 @@
 package runnable_test
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/ambardhesi/runnable/pkg/runnable"
-	"github.com/ambardhesi/runnable/pkg/runnable/mock"
 )
 
 func TestNewJob(t *testing.T) {
 	job, _ := runnable.NewJob("ownerID", "command name", "arg1", "arg2")
-	b := &bytes.Buffer{}
-	job.SetLogWriter(&mock.BufWriteCloser{b})
+	_ = os.MkdirAll("temp", 0700)
+	defer os.RemoveAll("temp")
+	logFile, _ := os.Create(path.Join("temp", job.ID))
+	job.SetLogWriter(logFile)
 
 	if job.ID == "" {
 		t.Errorf("expected non empty string for job ID")
@@ -39,8 +40,11 @@ func TestStartEcho(t *testing.T) {
 	cmd := "echo"
 	args := []string{"hello world"}
 	job, _ := runnable.NewJob("ownerID", cmd, args...)
-	b := &bytes.Buffer{}
-	job.SetLogWriter(&mock.BufWriteCloser{b})
+
+	_ = os.MkdirAll("temp", 0700)
+	defer os.RemoveAll("temp")
+	logFile, _ := os.Create(path.Join("temp", job.ID))
+	job.SetLogWriter(logFile)
 
 	job.Cmd = fakeCmd(cmd, args...)
 	job.Start()
@@ -54,6 +58,7 @@ func TestStartEcho(t *testing.T) {
 	if state := job.Status().State; state != runnable.Completed {
 		t.Errorf("expected state %v, got %v", runnable.Completed, state)
 	}
+
 }
 
 func TestStartExit(t *testing.T) {
@@ -61,8 +66,10 @@ func TestStartExit(t *testing.T) {
 	// cmd is to exit with code 1
 	args := []string{"1"}
 	job, _ := runnable.NewJob("ownerID", cmd, args...)
-	b := &bytes.Buffer{}
-	job.SetLogWriter(&mock.BufWriteCloser{b})
+	_ = os.MkdirAll("temp", 0700)
+	defer os.RemoveAll("temp")
+	logFile, _ := os.Create(path.Join("temp", job.ID))
+	job.SetLogWriter(logFile)
 
 	job.Cmd = fakeCmd(cmd, args...)
 	job.Start()
@@ -80,8 +87,11 @@ func TestStartExit(t *testing.T) {
 
 func TestStopRunningJob(t *testing.T) {
 	job, _ := runnable.NewJob("ownerID", "sleep", "1")
-	b := &bytes.Buffer{}
-	job.SetLogWriter(&mock.BufWriteCloser{b})
+
+	_ = os.MkdirAll("temp", 0700)
+	defer os.RemoveAll("temp")
+	logFile, _ := os.Create(path.Join("temp", job.ID))
+	job.SetLogWriter(logFile)
 
 	job.Cmd = fakeCmd("sleep", "1")
 	job.Start()
@@ -101,8 +111,11 @@ func TestStopRunningJob(t *testing.T) {
 
 func TestStopCompletedJob(t *testing.T) {
 	job, _ := runnable.NewJob("ownerID", "exit", "0")
-	b := &bytes.Buffer{}
-	job.SetLogWriter(&mock.BufWriteCloser{b})
+
+	_ = os.MkdirAll("temp", 0700)
+	defer os.RemoveAll("temp")
+	logFile, _ := os.Create(path.Join("temp", job.ID))
+	job.SetLogWriter(logFile)
 
 	job.Cmd = fakeCmd("exit", "0")
 	job.Start()

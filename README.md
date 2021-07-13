@@ -5,7 +5,7 @@ Runnable is a simple Linux process runner, implemented as a REST API.
 ```
 make certs
 ```
-This will generated keys and certs for the CA, 2 clients (Alice and Bob) and a bad client for testing.
+This will generate keys and certs for the CA, 2 clients (Alice and Bob) and a bad client for testing.
 
 ```
 $ make binaries
@@ -14,7 +14,9 @@ $ make binaries
 This will create the `runnable` (CLI client) and `runnable-client` (Server) binaries.
 
 ## Test
+```
 make test
+```
 
 ## Server
 Start the server by following the build step, then running `./runnable`.
