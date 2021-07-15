@@ -104,6 +104,7 @@ func (job *Job) Start() error {
 	logOutput := io.MultiReader(stdout, stderr)
 
 	err = job.Cmd.Start()
+
 	if err != nil {
 		return &Error{
 			Code:    EINTERNAL,

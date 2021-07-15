@@ -9,9 +9,10 @@ import (
 
 // Application error codes.
 const (
-	EINTERNAL = "internal"  // internal error
-	EINVALID  = "invalid"   // validation failed
-	ENOTFOUND = "not_found" // entity does not exist
+	EINTERNAL     = "internal"     // internal error
+	EINVALID      = "invalid"      // validation failed
+	ENOTFOUND     = "not_found"    // entity does not exist
+	EUNAUTHORIZED = "unauthorized" // used is not authorized
 )
 
 // Error defines a standard application error.
@@ -41,7 +42,7 @@ func (e *Error) Error() string {
 		buf.WriteString(e.Err.Error())
 	} else {
 		if e.Code != "" {
-			fmt.Fprintf(&buf, "<%s> ", e.Code)
+			fmt.Fprintf(&buf, "%s ", e.Code)
 		}
 		buf.WriteString(e.Message)
 	}
