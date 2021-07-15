@@ -95,7 +95,6 @@ func (s *Server) Start() {
 	}
 
 	// Start server on port provided in config
-	//router.Run(":" + strconv.Itoa(s.config.Port))
 	server := http.Server{
 		Addr:      "localhost:" + strconv.Itoa(s.config.Port),
 		Handler:   router,
@@ -103,7 +102,10 @@ func (s *Server) Start() {
 	}
 	s.server = server
 
-	log.Fatal(server.ListenAndServeTLS("", ""))
+	err = server.ListenAndServeTLS("", "")
+	if err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
 }
 
 func (s *Server) Stop() {
@@ -127,6 +129,7 @@ func (s *Server) monitorTerminationSignal() {
 		<-killChan
 		s.Stop()
 		close(killChan)
+		os.Exit(0)
 	}()
 }
 

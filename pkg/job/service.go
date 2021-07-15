@@ -39,12 +39,9 @@ func (jobSvc *JobService) Start(ownerID string, command string, args ...string) 
 		return "", err
 	}
 
-	err = job.Start()
-	if err != nil {
-		// TODO delete the job from the job store and delete log file
-		// similar rationale to above
-		return "", err
-	}
+	go func() {
+		job.Start()
+	}()
 
 	return job.ID, nil
 

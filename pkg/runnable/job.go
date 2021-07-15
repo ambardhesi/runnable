@@ -79,11 +79,8 @@ func (job *Job) Status() Status {
 // A goroutine will wait for the job to finish executing.
 // Returns InvalidStateError if the job is not in a NotStarted state.
 func (job *Job) Start() error {
-	job.lock.Lock()
-	defer job.lock.Unlock()
-
 	op := "JobService.Start"
-	if job.status.State != NotStarted {
+	if job.Status().State != NotStarted {
 		return &Error{
 			Code:    EINVALID,
 			Op:      op,
@@ -114,13 +111,15 @@ func (job *Job) Start() error {
 		}
 	}
 
+	job.lock.Lock()
+	job.status.State = Running
+	job.status.StartTime = time.Now()
+	job.lock.Unlock()
+
 	_, err = io.Copy(job.logWriter, logOutput)
 	if err != nil {
 		return err
 	}
-
-	job.status.State = Running
-	job.status.StartTime = time.Now()
 
 	go func() {
 		err := job.wait()

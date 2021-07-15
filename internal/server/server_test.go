@@ -10,9 +10,9 @@ import (
 	"github.com/ambardhesi/runnable/internal/server"
 )
 
-func startServer() *server.Server {
+func startServer(port int) *server.Server {
 	config := server.Config{
-		Port:           8080,
+		Port:           port,
 		LogDir:         "logs",
 		CertFilePath:   "../../certs/svr-cert.pem",
 		KeyFilePath:    "../../certs/svr-key.pem",
@@ -32,27 +32,8 @@ func startServer() *server.Server {
 	return s
 }
 
-func TestInvalidClientCertificate(t *testing.T) {
-	s := startServer()
-	defer s.Stop()
-
-	args := []string{
-		"--ca", "../../certs/ca-cert.pem",
-		"--cert", "../../certs/bad-cert.pem",
-		"--key", "../../certs/bad-key.pem",
-		"start", "echo", "hello", "world",
-	}
-
-	cmd := exec.Command("../../runnable-client", args...)
-
-	output, _ := cmd.CombinedOutput()
-	if !strings.Contains(string(output), "certificate signed by unknown authority") {
-		t.Errorf("expected cert signed by unknown authority error")
-	}
-}
-
 func TestUnauthorized(t *testing.T) {
-	s := startServer()
+	s := startServer(8080)
 	defer s.Stop()
 
 	// Alice starts a job
@@ -92,7 +73,7 @@ func TestUnauthorized(t *testing.T) {
 }
 
 func TestHappyPath(t *testing.T) {
-	s := startServer()
+	s := startServer(8081)
 	defer s.Stop()
 
 	// Alice starts a job
